@@ -3,14 +3,13 @@ import time
 
 class RateLimiter:
     """
-    RateLimiter implements the Sliding Window Log algorithm.
-    Tracks individual request timestamps per user to prevent API bursts.
+    our RateLimiter implements the Sliding Window Log algorithm.
     """
 
-    def __init__(self, max_request=5, window_seconds=60):
-        # Maximum allowed requests per window (default: 5 requests)
+    def __init__(self, max_request=5, window_seconds=60):       #default constructor if values are not given the default values will  be 5 and 60.
+        # Maximum allowed requests per window
         self.limit = max_request
-        # Size of the sliding time window in seconds (default: 60 seconds / 1 min)
+        # Size of the sliding time window in seconds
         self.window_seconds = window_seconds
         # Dictionary storing user request history -> { "user_id": [timestamp1, timestamp2, ...] }
         self.users = {}
@@ -42,4 +41,4 @@ class RateLimiter:
             self.users[user_id].append(curr_time)  # Record current request
             return True   # Request Allowed
         else:
-            return False  # Rate Limit Exceeded (HTTP 429)
+            return False  # Rate Limit Exceeded (HTTP 429)
