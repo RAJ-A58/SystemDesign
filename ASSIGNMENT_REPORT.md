@@ -24,7 +24,7 @@ This document details the step-by-step implementation of three interconnected sy
 
 #### B. Code Snippets & Explanations
 
-**1. Core Algorithm (`task2_Rate_limiter/rate_limiter.py`):**
+**1. Core Algorithm (`rate_limiter/rate_limiter.py`):**
 ```python
 import time
 
@@ -55,7 +55,7 @@ class RateLimiter:
             return False
 ```
 
-**2. Flask API Endpoint (`task2_Rate_limiter/api.py`):**
+**2. Flask API Endpoint (`rate_limiter/api.py`):**
 ```python
 from flask import Flask, request, jsonify
 from rate_limiter import RateLimiter
