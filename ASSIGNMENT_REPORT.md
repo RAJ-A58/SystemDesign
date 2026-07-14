@@ -176,7 +176,81 @@ if __name__ == "__main__":
 ---
 
 ### Task 3: Load Balancer Simulation
-*(In Progress...)*
+
+#### A. Process Description & Architectural Decisions
+- **Algorithm Choice:** We implemented the **Round-Robin Load Balancing Algorithm**. Round-Robin uniformly distributes incoming network traffic across a cluster of backend servers sequentially (`Server 1` $\rightarrow$ `Server 2` $\rightarrow$ `Server 3` $\rightarrow$ `Server 1`). We track the active target using a thread-safe index variable (`(current_index + 1) % len(BACKEND_SERVERS)` inside `threading.Lock`).
+- **Multiprocessing Server Architecture:** To cleanly simulate multiple independent physical machines from a single local workstation, we used Python's `multiprocessing.Process` module to launch 3 independent Flask servers running on distinct ports (`5002`, `5003`, and `5004`).
+- **Proxy Forwarding:** The central load balancer (`port 8000`) acts as a reverse proxy using Python's `requests` library to relay client headers, payloads, and HTTP methods directly to the selected target backend, returning the backend's exact response (`Hello from Server X!`) back to the client.
+
+#### B. Code Snippets & Explanations
+
+**1. Mock Backend Servers Launcher (`load_balancer/servers.py`):**
+```python
+from multiprocessing import Process
+from flask import Flask
+
+def create_server(server_name, port):
+    """Creates mock backend server returning unique identifier string."""
+    app = Flask(server_name)
+
+    @app.route("/", methods=["GET"])
+    def home():
+        return f"Hello from {server_name}! (Running on port {port})\n"
+
+    print(f"[{server_name}] Starting on http://127.0.0.1:{port}")
+    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+
+if __name__ == "__main__":
+    servers = [("Server 1", 5002), ("Server 2", 5003), ("Server 3", 5004)]
+    processes = [Process(target=create_server, args=(name, port)) for name, port in servers]
+    for p in processes: p.start()
+    for p in processes: p.join()
+```
+
+**2. Round-Robin Load Balancer Proxy (`load_balancer/lb.py`):**
+```python
+from flask import Flask, request, jsonify
+import requests
+from threading import Lock
+
+app = Flask(__name__)
+BACKEND_SERVERS = ["http://127.0.0.1:5002", "http://127.0.0.1:5003", "http://127.0.0.1:5004"]
+current_index = 0
+lock = Lock()
+
+def get_next_server():
+    """Selects next server via Round-Robin modulo rotation."""
+    global current_index
+    with lock:
+        server = BACKEND_SERVERS[current_index]
+        current_index = (current_index + 1) % len(BACKEND_SERVERS)
+        return server
+
+@app.route("/", methods=["GET", "POST", "PUT", "DELETE"])
+@app.route("/<path:path>", methods=["GET", "POST", "PUT", "DELETE"])
+def proxy_request(path=""):
+    target_server = get_next_server()
+    target_url = f"{target_server}/{path}"
+    try:
+        resp = requests.request(
+            method=request.method,
+            url=target_url,
+            headers={k: v for k, v in request.headers if k != 'Host'},
+            data=request.get_data(),
+            timeout=5
+        )
+        return resp.content, resp.status_code, dict(resp.headers)
+    except requests.exceptions.RequestException:
+        return jsonify({"error": "502 Bad Gateway", "message": f"Server {target_server} down."}), 502
+
+if __name__ == "__main__":
+    app.run(port=8000, debug=True)
+```
+
+#### C. Verification & Screenshots Checklist
+- [ ] **Screenshot 1: Terminal running `python servers.py`** showing all 3 mock servers (`Server 1`, `Server 2`, `Server 3`) active on ports `5002`, `5003`, and `5004`.
+- [ ] **Screenshot 2: Terminal running `python lb.py`** showing the Load Balancer active on port `8000`.
+- [ ] **Screenshot 3: Sequential Requests (`GET http://127.0.0.1:8000/`)** showing Round-Robin rotation cycling across `Hello from Server 1!`, `Hello from Server 2!`, and `Hello from Server 3!`.
 
 ---
 
