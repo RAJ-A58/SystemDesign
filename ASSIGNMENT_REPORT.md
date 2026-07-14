@@ -87,7 +87,91 @@ if __name__ == "__main__":
 ---
 
 ### Task 1: URL Shortener Lite
-*(In Progress...)*
+
+#### A. Process Description & Architectural Decisions
+- **Algorithm Choice:** We implemented a **Base62 Encoding Algorithm** (`0-9`, `a-z`, `A-Z` = 62 alphanumeric characters) to generate short, URL-safe identifiers (e.g., `g8`). Every time a URL is submitted, an internal auto-incrementing counter (`self.counter`) is converted from decimal integer format into Base62 string format (`num % 62` remainder lookups).
+- **Data Storage:** We used a Python In-Memory Dictionary (`dict[str, str]`) mapping `short_id` keys directly to `long_url` values (`{"g8": "https://github.com/RAJ-A58/SystemDesign"}`).
+- **HTTP Methods & Status Codes:**
+  - `POST /shorten`: Adheres to RESTful standards for resource creation (`HTTP 201 Created`).
+  - `GET /<short_id>`: Uses **HTTP 302 Found (Redirect)** to immediately forward the client browser to the original destination URL.
+
+#### B. Code Snippets & Explanations
+
+**1. Base62 Encoder Class (`url_shortener/shortener.py`):**
+```python
+import string
+
+class URLShortener:
+    def __init__(self):
+        # 62 characters for Base62: '0-9', 'a-z', 'A-Z'
+        self.characters = string.digits + string.ascii_letters
+        self.base = len(self.characters)  # 62
+        self.url_map = {}
+        self.counter = 1000  # Start at 1000 so IDs are at least 2 characters long
+
+    def encode(self, num):
+        """Encodes an integer into a Base62 string."""
+        if num == 0:
+            return self.characters[0]
+        encoded = []
+        while num > 0:
+            remainder = num % self.base
+            encoded.append(self.characters[remainder])
+            num //= self.base
+        return ''.join(reversed(encoded))
+
+    def shorten(self, long_url):
+        """Creates unique Base62 short ID and saves URL mapping."""
+        short_id = self.encode(self.counter)
+        self.url_map[short_id] = long_url
+        self.counter += 1
+        return short_id
+
+    def get_url(self, short_id):
+        """Retrieves original long URL for redirection."""
+        return self.url_map.get(short_id)
+```
+
+**2. Flask API Wrapper (`url_shortener/api.py`):**
+```python
+from flask import Flask, request, jsonify, redirect
+from shortener import URLShortener
+
+app = Flask(__name__)
+shortener = URLShortener()
+
+@app.route("/shorten", methods=["POST"])
+def shorten_url():
+    data = request.get_json()
+    if not data or "url" not in data:
+        return jsonify({"error": "Please provide a valid 'url' inside JSON."}), 400
+
+    long_url = data["url"]
+    short_id = shortener.shorten(long_url)
+    short_link = f"http://127.0.0.1:5001/{short_id}"
+
+    return jsonify({
+        "message": "URL shortened successfully!",
+        "short_id": short_id,
+        "short_url": short_link,
+        "original_url": long_url
+    }), 201
+
+@app.route("/<short_id>", methods=["GET"])
+def redirect_to_url(short_id):
+    original_url = shortener.get_url(short_id)
+    if original_url:
+        return redirect(original_url)  # HTTP 302 Redirect
+    else:
+        return jsonify({"error": f"Short URL ID '{short_id}' not found!"}), 404
+
+if __name__ == "__main__":
+    app.run(port=5001, debug=True)
+```
+
+#### C. Verification & Screenshots Checklist
+- [x] **Screenshot 1: Postman `POST /shorten` Request** showing `HTTP 201 CREATED` with JSON payload returning `"short_id": "g9"`.
+- [ ] **Screenshot 2: Browser Redirect (`GET /g9`)** showing the browser navigating to the destination GitHub repository.
 
 ---
 
