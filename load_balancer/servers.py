@@ -1,3 +1,4 @@
+import time
 from multiprocessing import Process
 from flask import Flask
 
@@ -10,11 +11,15 @@ def create_server(server_name, port):
 
     @app.route("/", methods=["GET"])
     def home():
+        # Simulate heavy processing (like a database query) to prove load balancing parallelization
+        time.sleep(0.1) 
         return f"Hello from {server_name}! (Running on port {port})\n"
+
 
     print(f"[{server_name}] Starting on http://127.0.0.1:{port}")
     # Disable reloader and debug when running in background processes
-    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+    # We also set threaded=False so each server simulates a single-threaded node
+    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=False)
 
 if __name__ == "__main__":
     # List of our 3 mock backend servers and their target ports
